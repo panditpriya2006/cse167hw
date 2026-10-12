@@ -192,6 +192,40 @@ def compose_transformation(transforms):
     for transform in transforms:
         pass
         # TODO: your code here
+        T = np.eye(3, dtype=np.float32)
+        
+        if "scale" in transform:
+            sx, sy = transform["scale"]
+            T[0, 0] = sx
+            T[1, 1] = sy
+
+        elif "shear_x" in transform:
+            val = transform["shear_x"]
+            lambda_x = val[0] if isinstance(val, (list, tuple)) else val
+            T[0, 1] = lambda_x
+
+        elif "shear_y" in transform:
+            val = transform["shear_y"]
+            lambda_y = val[0] if isinstance(val, (list, tuple)) else val
+            T[1, 0] = lambda_y
+
+        elif "rotate" in transform:
+            val = transform["rotate"]
+            angle_deg = val[0] if isinstance(val, (list, tuple)) else val
+            theta = np.radians(angle_deg)
+            cos_t = np.cos(theta)
+            sin_t = np.sin(theta)
+            T[0, 0] = cos_t
+            T[0, 1] = -sin_t
+            T[1, 0] = sin_t
+            T[1, 1] = cos_t
+
+        elif "translate" in transform:
+            tx, ty = transform["translate"]
+            T[0, 2] = tx
+            T[1, 2] = ty
+
+        F = T @ F
 
     return F
 
