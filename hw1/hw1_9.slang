@@ -17,7 +17,5 @@ void compute_main(uint2 tid : SV_DispatchThreadID,
     if (tid.x >= width || tid.y >= height) {
         return;
     }
-
     image[tid] = float4(1.0);
-    // TODO: your code here
 }

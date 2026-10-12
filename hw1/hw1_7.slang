@@ -1,18 +1,14 @@
-
 import hw1_common;
 
 // Squared distance from a point to a line segment.
-float segment_distance_squared(float2 p, float2 a, float2 b)
-{
+float segment_distance_squared(float2 p, float2 a, float2 b){
     float2 ab = b - a;
     float denom = dot(ab, ab);
-
     float t = 0.0;
     if (denom > 1e-8)
     {
         t = clamp(dot(p - a, ab) / denom, 0.0, 1.0);
     }
-
     float2 closest = a + t * ab;
     float2 diff = p - closest;
     return dot(diff, diff);
@@ -26,29 +22,24 @@ bool point_in_polygon(
     int pts_end)
 {
     bool inside = false;
-
     for (int i = pts_begin, j = pts_end - 1;
          i < pts_end;
          j = i, i++)
     {
         float2 a = points[i];
         float2 b = points[j];
-
         bool crosses = ((a.y > p.y) != (b.y > p.y));
-
         if (crosses)
         {
             float x_intersection =
                 (b.x - a.x) * (p.y - a.y) /
                 (b.y - a.y) + a.x;
-
             if (p.x < x_intersection)
             {
                 inside = !inside;
             }
         }
     }
-
     return inside;
 }
 
@@ -58,7 +49,6 @@ float3 alpha_blend(float3 behind, float4 foreground)
     return foreground.rgb * foreground.a
          + behind * (1.0 - foreground.a);
 }
-
 [shader("compute")]
 [numthreads(8, 8, 1)]
 void compute_main(
@@ -75,16 +65,13 @@ void compute_main(
 {
     uint width, height;
     image.GetDimensions(width, height);
-
     if (tid.x >= width || tid.y >= height)
     {
         return;
     }
-
     // Ensure that at least one sample is taken per pixel.
     int spp = max(samples_per_axis, 1);
     float3 pixel_sum = float3(0.0, 0.0, 0.0);
-
     // Sample multiple positions inside each pixel.
     for (int sy = 0; sy < spp; sy++)
     {
@@ -95,39 +82,30 @@ void compute_main(
                 float(height) -
                     (float(tid.y) + (float(sy) + 0.5) / float(spp))
             );
-
             // Each sample starts with the background color.
             float3 color = background;
-
             // Process shapes in scene order.
             for (int s = 0; s < num_shapes; s++)
             {
                 Shape shape = shapes[s];
-
                 // Transform the sample into object coordinates.
                 float3 local_h = mul(
                     shape.world_to_obj,
                     float3(pixel, 1.0)
                 );
-
                 float2 p = local_h.xy / local_h.z;
-
                 if (shape.type == ShapeType::Circle)
                 {
                     Circle circle = circles[shape.index];
-
                     float dist = length(p - circle.center);
-
                     // Fill and stroke are separate compositing layers.
                     if (shape.use_fill && dist <= circle.radius)
                     {
                         color = alpha_blend(color, shape.fill_rgba);
                     }
-
                     if (shape.use_stroke)
                     {
                         float half_width = shape.stroke_width * 0.5;
-
                         if (abs(dist - circle.radius) <= half_width)
                         {
                             color = alpha_blend(
@@ -140,14 +118,11 @@ void compute_main(
                 else if (shape.type == ShapeType::Polyline)
                 {
                     Polyline polyline = polylines[shape.index];
-
                     int n = polyline.pts_end - polyline.pts_begin;
-
                     if (n < 2)
                     {
                         continue;
                     }
-
                     // Composite the polygon fill first.
                     if (shape.use_fill && polyline.closed)
                     {
@@ -157,7 +132,6 @@ void compute_main(
                             polyline.pts_begin,
                             polyline.pts_end
                         );
-
                         if (inside)
                         {
                             color = alpha_blend(
@@ -166,7 +140,6 @@ void compute_main(
                             );
                         }
                     }
-
                     // Find the closest edge for the stroke.
                     if (shape.use_stroke)
                     {
@@ -184,7 +157,6 @@ void compute_main(
 
                             min_dist_sq = min(min_dist_sq, d_sq);
                         }
-
                         // Include the closing edge for closed polygons.
                         if (polyline.closed)
                         {
