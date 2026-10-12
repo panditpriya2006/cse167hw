@@ -182,36 +182,25 @@ def parse_scene(filename : str) -> Scene:
                  quadratic_beziers,
                  points)
 
+
 def compose_transformation(transforms):
     """
-        Given a list of transformations, compose them into a matrix.
+    Given a list of transformations, compose them into a matrix.
     """
-
     F = np.eye(3, dtype=np.float32)
-
     for transform in transforms:
-        pass
-        # TODO: your code here
         T = np.eye(3, dtype=np.float32)
-        
         if "scale" in transform:
             sx, sy = transform["scale"]
             T[0, 0] = sx
             T[1, 1] = sy
-
-        elif "shear_x" in transform:
-            val = transform["shear_x"]
-            lambda_x = val[0] if isinstance(val, (list, tuple)) else val
-            T[0, 1] = lambda_x
-
-        elif "shear_y" in transform:
-            val = transform["shear_y"]
-            lambda_y = val[0] if isinstance(val, (list, tuple)) else val
-            T[1, 0] = lambda_y
-
+        elif "translate" in transform:
+            tx, ty = transform["translate"]
+            T[0, 2] = tx
+            T[1, 2] = ty
         elif "rotate" in transform:
-            val = transform["rotate"]
-            angle_deg = val[0] if isinstance(val, (list, tuple)) else val
+            value = transform["rotate"]
+            angle_deg = value[0] if isinstance(value, (list, tuple)) else value
             theta = np.radians(angle_deg)
             cos_t = np.cos(theta)
             sin_t = np.sin(theta)
@@ -219,21 +208,59 @@ def compose_transformation(transforms):
             T[0, 1] = -sin_t
             T[1, 0] = sin_t
             T[1, 1] = cos_t
-
-        elif "translate" in transform:
-            tx, ty = transform["translate"]
-            T[0, 2] = tx
-            T[1, 2] = ty
-
+        elif "shear_x" in transform:
+            value = transform["shear_x"]
+            shear = value[0] if isinstance(value, (list, tuple)) else value
+            T[0, 1] = shear
+        elif "shear_y" in transform:
+            value = transform["shear_y"]
+            shear = value[0] if isinstance(value, (list, tuple)) else value
+            T[1, 0] = shear
+        else:
+            raise ValueError(f"Unknown transformation: {transform}")
         F = T @ F
-
     return F
 
-def interpolate_transformation(transform_keyframes, t):
-    # TODO: your code here
 
-    # Should never happen?
-    assert False
+def interpolate_transformation(transform_keyframes, t):
+    if not transform_keyframes:
+        return []
+    # Ensure keyframes are ordered by time.
+    keyframes = sorted(transform_keyframes, key=lambda k: k['time'])
+    # Clamp to the first or last keyframe outside the time range.
+    if t <= keyframes[0]['time']:
+        return keyframes[0]['transform']
+    if t >= keyframes[-1]['time']:
+        return keyframes[-1]['transform']
+    # Find the two keyframes surrounding t.
+    for i in range(len(keyframes) - 1):
+        k0 = keyframes[i]
+        k1 = keyframes[i + 1]
+        if k0['time'] <= t <= k1['time']:
+            t0 = k0['time']
+            t1 = k1['time']
+            w = (t - t0) / (t1 - t0)
+            transforms0 = k0['transform']
+            transforms1 = k1['transform']
+            result = []
+            for tr0, tr1 in zip(transforms0, transforms1):
+                if tr0.keys() != tr1.keys():
+                    raise ValueError(
+                        "Corresponding keyframes must use the same "
+                        "transformation types in the same order."
+                    )
+                kind = next(iter(tr0))
+                if kind not in tr1:
+                    raise ValueError(
+                        "Corresponding keyframes have different transformations."
+                    )
+                v0 = np.asarray(tr0[kind], dtype=np.float32)
+                v1 = np.asarray(tr1[kind], dtype=np.float32)
+                value = (1 - w) * v0 + w * v1
+                result.append({kind: value.tolist()})
+            return result
+    raise ValueError(f"Could not interpolate transformation at time {t}")
+
 
 def upload_scene(scene, module, slang_device, t=0.0):
     # Keyframe parameters are interpolated on the CPU;
